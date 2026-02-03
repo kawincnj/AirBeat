@@ -2,69 +2,94 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import helper_functions as hf
+import sound_loading as sl
 
+mp_holistic = mp.solutions.holistic
 mp_drawing = mp.solutions.drawing_utils
-mp_pose = mp.solutions.pose
 
-cap = cv2.VideoCapture(0)
-
-pose = mp_pose.Pose(
+holistic = mp_holistic.Holistic(
     static_image_mode=False,
-    model_complexity=1,
-    enable_segmentation=False,
+    model_complexity=0,
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5
 )
 
+cap = cv2.VideoCapture(0)
+
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(640/1))
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(480/1))
+
+left_hand_up = True
+right_hand_up = True
+
 while cap.isOpened():
     success, frame = cap.read()
-    h, w, c = frame.shape
-
     if not success:
-        print("Ignoring empty camera frame.")
-        continue
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-    results = pose.process(frame_rgb)
-
-    # Get the coordinates
-    if results.pose_landmarks:
-
-        landmarks = results.pose_landmarks.landmark
-
-        right_hip = landmarks[24]
-        right_knee = landmarks[26]
-        right_ankle = landmarks[28]
-
-        knee = np.array([right_knee.x * w, right_knee.y * h, right_knee.z])
-        hip = np.array([right_hip.x * w, right_hip.y * h, right_hip.z])
-        ankle = np.array([right_ankle.x * w, right_ankle.y * h, right_ankle.z])
-
-        v1 = hip - knee
-        v2 = ankle - knee
-
-        angle = hf.angle_between_vectors(v1, v2)
-        print("Right knee angle:", angle)
-
-
-
-
-    if results.pose_landmarks:
-        mp_drawing.draw_landmarks(
-            frame,
-            results.pose_landmarks,
-            mp_pose.POSE_CONNECTIONS,
-            mp_drawing.DrawingSpec(color=(0,255,0), thickness=2),
-            mp_drawing.DrawingSpec(color=(0,0,255), thickness=2)
-        )
+        break
 
     frame = cv2.flip(frame, 1)
-    cv2.imshow("Full Body Tracking - MediaPipe Pose", frame)
+    h, w, c = frame.shape
+
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    
+    frame_rgb.flags.writeable = False
+    results = holistic.process(frame_rgb)
+    frame_rgb.flags.writeable = True
+
+    # RESULTS
+    pose = results.pose_landmarks
+    left_hand = results.right_hand_landmarks
+    right_hand = results.left_hand_landmarks
+
+    if pose:
+        landmarks = pose.landmark
+        
+        L_angle, R_angle, is_sitting = hf.is_sitting(landmarks, w, h)
+        
+        status_text = "IS SITTING" if is_sitting else "NOT SITTING"
+        color = (0, 255, 0) if is_sitting else (0, 0, 255)
+        cv2.putText(frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+
+        # Draw Pose Landmarks
+        mp_drawing.draw_landmarks(
+            frame, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS,
+            mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+            mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2, circle_radius=1)
+        )
+
+    if right_hand: #SHOW RIGHT
+        landmarks = right_hand.landmark
+
+        if right_hand_up and (not hf.hand_up(right_hand_up, landmarks[12].z)):
+            sl.play_cajon_on()
+
+        right_hand_up = hf.hand_up(right_hand_up, landmarks[12].z)
+
+        status_text = "UP" if right_hand_up else "DOWN"
+        color = (0, 255, 0) if right_hand_up else (0, 0, 255)
+        cv2.putText(frame, status_text, (530, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+
+        mp_drawing.draw_landmarks(frame, right_hand, mp_holistic.HAND_CONNECTIONS)
+        
+    if left_hand: #SHOW LEFT
+        landmarks = left_hand.landmark
+
+        if left_hand_up and (not hf.hand_up(left_hand_up, landmarks[12].z)):
+            sl.play_cajon_off()
+        left_hand_up = hf.hand_up(left_hand_up, landmarks[12].z)
+
+        status_text = "UP" if left_hand_up else "DOWN"
+        color = (0, 255, 0) if left_hand_up else (0, 0, 255)
+        cv2.putText(frame, status_text, (80, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+
+        mp_drawing.draw_landmarks(frame, left_hand, mp_holistic.HAND_CONNECTIONS)
+
+    cv2.imshow("Optimized Full Body Tracking", frame)
 
     if cv2.waitKey(5) & 0xFF == 27:  # ESC to exit
         break
 
 # Cleanup
-pose.close()
+holistic.close()
 cap.release()
 cv2.destroyAllWindows()

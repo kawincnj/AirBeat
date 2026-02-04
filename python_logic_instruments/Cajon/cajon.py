@@ -5,38 +5,40 @@ import helper_functions as hf
 import sound_loading as sl
 from time import time
 
-mp_holistic = mp.solutions.holistic
+# Initialize MediaPipe Hands
+mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 
-holistic = mp_holistic.Holistic(
-    static_image_mode=False,
-    model_complexity=0,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5
+hands = mp_hands.Hands(
+    max_num_hands=2,
+    min_detection_confidence=0.3,
+    min_tracking_confidence=0.7
 )
 
+# Camera setup with optimized settings
 cap = cv2.VideoCapture(0)
-
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(640/1))
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(480/1))
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+cap.set(cv2.CAP_PROP_FPS, 30)  # Set desired FPS
+cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffer to reduce lag
 
 # Declare Variable
 left_hand_up = True
 right_hand_up = True
-
 left_hand_upper = None
 right_hand_upper = None
-
-mid_height_knee = 0
-
 threshold = 0
+Y_seperate = 0
 
 # Calibrate Variables
-count = 0
 is_calibrate = True
 calibrate_Zpoint = []
 start_time = time()
-time_set = 10
+time_set = 5
+
+# Performance optimization variables
+frame_skip = 0
+FRAME_SKIP_COUNT = 0  # Process every frame for maximum responsiveness
 
 while cap.isOpened():
     success, frame = cap.read()
@@ -46,99 +48,109 @@ while cap.isOpened():
     frame = cv2.flip(frame, 1)
     h, w, c = frame.shape
 
+    # Frame skipping for non-critical rendering (disabled for max speed)
+    frame_skip += 1
+    process_frame = frame_skip > FRAME_SKIP_COUNT
+    if process_frame:
+        frame_skip = 0
+
+    # RGB conversion
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    
     frame_rgb.flags.writeable = False
-    results = holistic.process(frame_rgb)
+    results = hands.process(frame_rgb)
     frame_rgb.flags.writeable = True
 
-    # RESULTS
-    pose = results.pose_landmarks
-    left_hand = results.right_hand_landmarks
-    right_hand = results.left_hand_landmarks
+    # RESULTS - extract once
+    left_hand = None
+    right_hand = None
+
+    if results.multi_hand_landmarks and results.multi_handedness:
+        for idx, hand_info in enumerate(results.multi_handedness):
+            label = hand_info.classification[0].label  # "Left" or "Right"
+            if label == "Left":
+                left_hand = results.multi_hand_landmarks[idx]
+            elif label == "Right":
+                right_hand = results.multi_hand_landmarks[idx]
+
 
     if is_calibrate:
-
         try:
             left_center = (int(left_hand.landmark[9].x * w), int(left_hand.landmark[9].y * h))
             right_center = (int(right_hand.landmark[9].x * w), int(right_hand.landmark[9].y * h))
-            cv2.circle(frame, left_center, 50, (0,0,255), 4)
-            cv2.circle(frame, right_center, 50, (0,0,255), 4)
+            cv2.circle(frame, left_center, 50, (0, 0, 255), 4)
+            cv2.circle(frame, right_center, 50, (0, 0, 255), 4)
         except:
             pass
 
         sec_now = time() - start_time
-        if( sec_now <= (time_set)):
-            cv2.putText(frame,'Start calibrate in:',(90, 190), 1, 3, (20, 123, 13), 5)
-            cv2.putText(frame, str(time_set - int(sec_now)),(300, 260), 1, 4, (0, 255, 0), 5)
+        if sec_now <= time_set:
+            cv2.putText(frame, 'Start calibrate in:', (90, 190), 1, 3, (20, 123, 13), 5)
+            cv2.putText(frame, str(time_set - int(sec_now)), (300, 260), 1, 4, (0, 255, 0), 5)
         else:
-            cv2.putText(frame,'Start calibrate',(50, 60), 1, 3, (20, 123, 13), 5)
-            calibrate_Zpoint += [left_hand.landmark[9].z, right_hand.landmark[9].z]
-            if (time() - start_time >= (3 + time_set)):
-                threshold = abs(np.average(calibrate_Zpoint))
-                threshold += (10 ** -(hf.find_len_after_deci(threshold))) * 14
-                print(threshold)
-                is_calibrate = False
+            cv2.putText(frame, 'Start calibrate', (50, 60), 1, 3, (20, 123, 13), 5)
+            try:
+                calibrate_Zpoint += [left_hand.landmark[12].z, right_hand.landmark[12].z]
+                if (time() - start_time >= (3 + time_set)):
+                    threshold = abs(np.average(calibrate_Zpoint))
+                    threshold += (10 ** -(hf.find_len_after_deci(threshold))) * 24
+                    Y_seperate = int(min(left_hand.landmark[1].y, right_hand.landmark[1].y) * h)
+                    print(f"Calibration complete. Threshold: {threshold}")
+                    is_calibrate = False
+            except:
+                pass
     else:
-        if pose:
-            landmarks = pose.landmark
-            
-            L_angle, R_angle, is_sitting = hf.is_sitting(landmarks, w, h)
-
-            # Line of sound
-            cv2.line(frame, (int(landmarks[26].x * w), int(landmarks[26].y * h)), (int(landmarks[25].x * w), int(landmarks[25].y * h)),
-                    (255, 0, 0), 5)
-            mid_height_knee = int((landmarks[26].y * h + landmarks[25].y * h)/2)
-
-            status_text = "IS SITTING" if is_sitting else "NOT SITTING"
-            color = (0, 255, 0) if is_sitting else (0, 0, 255)
-            cv2.putText(frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-
-            # Draw Pose Landmarks
-            mp_drawing.draw_landmarks(
-                frame, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2, circle_radius=1)
-            )
-
-        if right_hand: #SHOW RIGHT
+        if right_hand:
             landmarks = right_hand.landmark
-
-            right_hand_upper = int((landmarks[1].y) * h) < mid_height_knee
-
-            if right_hand_up and (not hf.hand_up(right_hand_up, landmarks[12].z, threshold= threshold)):
-                sl.play_cajon_on() if right_hand_upper else sl.play_cajon_off()
-
-            right_hand_up = hf.hand_up(right_hand_up, landmarks[12].z, threshold= threshold)
-
-            status_text = "UP" if right_hand_up else "DOWN"
-            color = (0, 255, 0) if right_hand_up else (0, 0, 255)
-            cv2.putText(frame, status_text, (530, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-
-            mp_drawing.draw_landmarks(frame, right_hand, mp_holistic.HAND_CONNECTIONS)
+            z_value = landmarks[12].z
+        
+            right_hand_upper = int(landmarks[1].y * h) < Y_seperate
             
-        if left_hand: #SHOW LEFT
+            is_hand_down = not hf.hand_up(right_hand_up, z_value, threshold=threshold)
+            if right_hand_up and is_hand_down:
+                if right_hand_upper:
+                    sl.play_cajon_on()
+                else:
+                    sl.play_cajon_off()
+            
+            right_hand_up = not is_hand_down
+  
+        if left_hand:
             landmarks = left_hand.landmark
+            z_value = landmarks[12].z
 
-            left_hand_upper = int((landmarks[1].y) * h)  < mid_height_knee
+            left_hand_upper = int(landmarks[1].y * h) < Y_seperate
+            
+            is_hand_down = not hf.hand_up(left_hand_up, z_value, threshold=threshold)
+            if left_hand_up and is_hand_down:
+                if left_hand_upper:
+                    sl.play_cajon_on()
+                else:
+                    sl.play_cajon_off()
+            
+            left_hand_up = not is_hand_down
 
-            if left_hand_up and (not hf.hand_up(left_hand_up, landmarks[12].z, threshold= threshold)):
-                sl.play_cajon_on() if left_hand_upper else sl.play_cajon_off()
+        if process_frame:
 
-            left_hand_up = hf.hand_up(left_hand_up, landmarks[12].z, threshold= threshold)
+            cv2.line(frame, (0, Y_seperate), (640, Y_seperate), (255,0,0), 3, 2)
 
-            status_text = "UP" if left_hand_up else "DOWN"
-            color = (0, 255, 0) if left_hand_up else (0, 0, 255)
-            cv2.putText(frame, status_text, (80, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-
-            mp_drawing.draw_landmarks(frame, left_hand, mp_holistic.HAND_CONNECTIONS)
+            if right_hand:
+                status_text = "UP" if right_hand_up else "DOWN"
+                color = (0, 255, 0) if right_hand_up else (0, 0, 255)
+                cv2.putText(frame, status_text, (530, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+                mp_drawing.draw_landmarks(frame, right_hand, mp_hands.HAND_CONNECTIONS)
+                
+            if left_hand:
+                status_text = "UP" if left_hand_up else "DOWN"
+                color = (0, 255, 0) if left_hand_up else (0, 0, 255)
+                cv2.putText(frame, status_text, (80, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+                mp_drawing.draw_landmarks(frame, left_hand, mp_hands.HAND_CONNECTIONS)
 
     cv2.imshow("Optimized Full Body Tracking", frame)
 
-    if cv2.waitKey(5) & 0xFF == 27:  # ESC to exit
+    if cv2.waitKey(1) & 0xFF == 27:  # Changed to 1ms for faster response
         break
 
 # Cleanup
-holistic.close()
+hands.close()
 cap.release()
 cv2.destroyAllWindows()

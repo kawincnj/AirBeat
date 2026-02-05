@@ -27,12 +27,14 @@ left_hand_up = True
 right_hand_up = True
 left_hand_upper = None
 right_hand_upper = None
-threshold = 0
+threshold_upper = 0
+threshold_lower = 0
 Y_seperate = 0
 
 # Calibrate Variables
 is_calibrate = True
-calibrate_Zpoint = []
+calibrate_Zpoint_upper = []
+calibrate_Zpoint_lower = []
 start_time = time()
 time_set = 5
 
@@ -89,12 +91,12 @@ while cap.isOpened():
         else:
             cv2.putText(frame, 'Start calibrate', (50, 60), 1, 3, (20, 123, 13), 5)
             try:
-                calibrate_Zpoint += [left_hand.landmark[12].z, right_hand.landmark[12].z]
+                calibrate_Zpoint_upper.append(min(left_hand.landmark[12].z, right_hand.landmark[12].z))
+                calibrate_Zpoint_lower.append(max(left_hand.landmark[12].z, right_hand.landmark[12].z))
                 if (time() - start_time >= (3 + time_set)):
-                    threshold = abs(np.average(calibrate_Zpoint))
-                    threshold += (10 ** -(hf.find_len_after_deci(threshold))) * 24
+                    threshold_upper = abs(np.average(calibrate_Zpoint_upper))
+                    threshold_lower = abs(np.average(calibrate_Zpoint_lower))
                     Y_seperate = int(min(left_hand.landmark[1].y, right_hand.landmark[1].y) * h)
-                    print(f"Calibration complete. Threshold: {threshold}")
                     is_calibrate = False
             except:
                 pass
@@ -105,7 +107,7 @@ while cap.isOpened():
         
             right_hand_upper = int(landmarks[1].y * h) < Y_seperate
             
-            is_hand_down = not hf.hand_up(right_hand_up, z_value, threshold=threshold)
+            is_hand_down = not hf.hand_up(right_hand_up, z_value, right_hand_upper, threshold_upper, threshold_lower)
             if right_hand_up and is_hand_down:
                 if right_hand_upper:
                     sl.play_cajon_on()
@@ -120,7 +122,7 @@ while cap.isOpened():
 
             left_hand_upper = int(landmarks[1].y * h) < Y_seperate
             
-            is_hand_down = not hf.hand_up(left_hand_up, z_value, threshold=threshold)
+            is_hand_down = not hf.hand_up(left_hand_up, z_value, right_hand_upper, threshold_upper, threshold_lower)
             if left_hand_up and is_hand_down:
                 if left_hand_upper:
                     sl.play_cajon_on()

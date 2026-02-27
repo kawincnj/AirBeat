@@ -7,3 +7,5 @@ def cosine_similarity(arr1, arr2):
 # Return median value of each point in vector
 def representative_vector(arr, center):
     return np.median(np.array(arr) - center, axis=0)
+
+print(cosine_similarity([], []))

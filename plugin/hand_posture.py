@@ -52,7 +52,8 @@ while cap.isOpened():
 
     if left_hand: mp_drawing.draw_landmarks(frame, left_hand, mp_hands.HAND_CONNECTIONS)
 
-    cv2.imshow("Optimized Full Body Tracking", frame)
+    cv2.imshow("Hand Tracking", frame)
 
-    if cv2.waitKey(1) & 0xFF == 27:  # Changed to 1ms for faster response
+    key = cv2.waitKey(1)
+    if key == 27:
         break

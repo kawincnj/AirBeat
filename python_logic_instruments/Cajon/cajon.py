@@ -122,7 +122,7 @@ while cap.isOpened():
 
             left_hand_upper = int(landmarks[1].y * h) < Y_seperate
             
-            is_hand_down = not hf.hand_up(left_hand_up, z_value, right_hand_upper, threshold_upper, threshold_lower)
+            is_hand_down = not hf.hand_up(left_hand_up, z_value, left_hand_upper, threshold_upper, threshold_lower)
             if left_hand_up and is_hand_down:
                 if left_hand_upper:
                     sl.play_cajon_on()

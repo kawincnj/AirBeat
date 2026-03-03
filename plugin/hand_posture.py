@@ -1,72 +1,99 @@
 import cv2
 import numpy as np
-import mediapipe as mp
+import os
+import time
+from hand_tracker import ThreadedHandTracker
 import helper_function as hp
 
-mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
+# Initialize
+tracker = ThreadedHandTracker(min_detection_confidence=0.7, min_tracking_confidence=0.7)
+templates_dir = "templates"
 
-hands = mp_hands.Hands(
-    max_num_hands=2,
-    min_detection_confidence=0.3,
-    min_tracking_confidence=0.7
-)
+# Templates
+current_template = hp.StaticPoseTemplate("Open_Hand")
+status_msg = "Press 'H' for help"
+msg_expiry = 0
 
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-cap.set(cv2.CAP_PROP_FPS, 60)  # Set desired FPS
-cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffer to reduce lag
+def set_status(msg, duration=60):
+    global status_msg, msg_expiry
+    status_msg = msg
+    msg_expiry = duration
 
-# Declare
-open_hand = hp.StaticPoseTemplate()
+try:
+    while True:
+        frame, left_hand, right_hand = tracker.read()
+        
+        if frame is None:
+            time.sleep(0.01)
+            continue
 
-while cap.isOpened():
-    success, frame = cap.read()
-    if not success:
-        break
+        tracker.draw_landmarks(frame, left_hand)
+        tracker.draw_landmarks(frame, right_hand)
 
-    frame = cv2.flip(frame, 1)
-    h, w, c = frame.shape
+        # UI Overlay
+        cv2.putText(frame, f"Template: {current_template.name}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(frame, f"Refs: {len(current_template.reference_vectors)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        if msg_expiry > 0:
+            cv2.putText(frame, status_msg, (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            msg_expiry -= 1
+        else:
+            cv2.putText(frame, "Press 'H' for help", (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
 
-    # RGB conversion
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    frame_rgb.flags.writeable = False
-    results = hands.process(frame_rgb)
-    frame_rgb.flags.writeable = True
+        # Similarity check if representative vector exists
+        if right_hand and current_template.representative_vector is not None:
+            processed = hp.StaticPoseTemplate.process_landmarks(right_hand)
+            sim = current_template.find_similarity(processed)
+            color = (0, 255, 0) if sim > 0.9 else (0, 0, 255)
+            cv2.putText(frame, f"Similarity: {sim:.3f}", (400, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
-    left_hand = None
-    right_hand = None
+        cv2.imshow("Hand Posture Template Tool", frame)
+        key = cv2.waitKey(1) & 0xFF
 
-    if results.multi_hand_landmarks and results.multi_handedness:
-        for idx, hand_info in enumerate(results.multi_handedness):
-            label = hand_info.classification[0].label  # "Left" or "Right"
-            if label == "Left":
-                left_hand = results.multi_hand_landmarks[idx]
-            elif label == "Right":
-                right_hand = results.multi_hand_landmarks[idx]
+        if key == ord('h'):
+            print("\n--- Help ---")
+            print("A: Add current right hand pose as reference")
+            print("W: Calculate representative vector (median)")
+            print("S: Save template to disk")
+            print("E: Clear references")
+            print("N: Change template name")
+            print("ESC: Exit")
+            set_status("Help printed to console", 90)
 
-    if right_hand:
-        mp_drawing.draw_landmarks(frame, right_hand, mp_hands.HAND_CONNECTIONS)
-        r_landmarks = right_hand.landmark
+        elif key == ord('a'):
+            if right_hand:
+                current_template.add_reference(right_hand)
+                set_status(f"Added ref {len(current_template.reference_vectors)}", 30)
+            else:
+                set_status("No right hand detected!", 60)
 
-    if left_hand: mp_drawing.draw_landmarks(frame, left_hand, mp_hands.HAND_CONNECTIONS)
+        elif key == ord('w'):
+            if current_template.reference_vectors:
+                current_template.calculate_representative_vector()
+                set_status("Representative vector calculated", 60)
+            else:
+                set_status("No references to calculate!", 60)
 
-    cv2.imshow("Hand Tracking", frame)
+        elif key == ord('s'):
+            if current_template.save(templates_dir):
+                set_status(f"Saved to {templates_dir}/{current_template.name}.json", 90)
+            else:
+                set_status("Failed to save (no rep vector?)", 60)
 
-    key = cv2.waitKey(1)
+        elif key == ord('e'):
+            current_template.clear_reference_vector()
+            set_status("References cleared", 60)
 
-    if key == ord('a'):
-        open_hand.add_reference(r_landmarks)
-    elif key == ord('l'):
-        print(len(open_hand.reference_vector))
-    elif key == ord('e'):
-        open_hand.clear_reference_vector()
-    elif key == ord('w'):
-        open_hand.calculate_representative_vector()
-        print(open_hand.representative_vector)
-    elif key == ord('c'):
-        print(open_hand.find_similarity(hp.StaticPoseTemplate.process_landmarks(r_landmarks)))
+        elif key == ord('n'):
+            # Using input() here might block the camera thread from updating UI 
+            # but ThreadedHandTracker will keep capturing in background
+            new_name = input("Enter new template name: ")
+            current_template.name = new_name
+            set_status(f"Name set to: {new_name}", 60)
 
-    if key == 27:
-        break
+        elif key == 27:
+            break
+
+finally:
+    tracker.stop()
+    cv2.destroyAllWindows()

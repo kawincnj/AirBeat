@@ -5,7 +5,7 @@ import time
 from hand_tracker import ThreadedHandTracker
 import helper_function as hp
 
-# Initialize
+# Initializea
 tracker = ThreadedHandTracker(min_detection_confidence=0.7, min_tracking_confidence=0.7)
 templates_dir = "templates"
 
@@ -44,7 +44,7 @@ try:
         if right_hand and current_template.representative_vector is not None:
             processed = hp.StaticPoseTemplate.process_landmarks(right_hand)
             sim = current_template.find_similarity(processed)
-            color = (0, 255, 0) if sim > 0.9 else (0, 0, 255)
+            color = (0, 255, 0) if sim > 0.99 else (0, 0, 255)
             cv2.putText(frame, f"Similarity: {sim:.3f}", (400, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
         cv2.imshow("Hand Posture Template Tool", frame)

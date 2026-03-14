@@ -10,6 +10,7 @@ class ThreadedHandTracker:
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         self.cap.set(cv2.CAP_PROP_FPS, 30)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        #self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
 
         self.mp_hands = mp.solutions.hands
         self.mp_drawing = mp.solutions.drawing_utils

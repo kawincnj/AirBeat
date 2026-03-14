@@ -4,16 +4,13 @@ import time
 import os
 import sys
 
-# --- SMART PATH FIX ---
-# This allows you to run the script directly from your editor or terminal
-# It finds the project root (AirBeat) and adds it to Python's search path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if project_root not in sys.path:
     sys.path.append(project_root)
 # ----------------------
 
 from plugin.hand_tracker import ThreadedHandTracker
-#from plugin.sound_manager import sound_manager
+from plugin.sound_manager import sound_manager
 
 def run_ukulele():
 

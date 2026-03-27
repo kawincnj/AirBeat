@@ -1,8 +1,9 @@
 .container {
     width: 100%;
     height: 100vh;
-    background-color: #ffffff;
-    position: relative;
+    background-color: #12121A;
+    display: flex;
+    flex-direction: column;
 }
 
 .header {
@@ -24,12 +25,13 @@
     flex-direction: column;
     justify-content: center;
 }
+
 .name {
     font-size: 18px;
     font-weight: bold;
     font-family: 'Helvetica', monospace;
     margin-left: 10px; 
-    color: #000000;
+    color: #FFFFFF;
 }
 
 .username {
@@ -37,7 +39,7 @@
     font-weight: normal;
     font-family: 'Helvetica', monospace;
     margin-left: 10px;
-    color: #000000;
+    color: #FFFFFF;
 }
 
 .weltext {
@@ -46,13 +48,14 @@
     flex-direction: column;
     top: 90px;
     left: 20px;
+    
 }
 
 .welcome {
     font-size: 20px;
     font-weight: lighter;
     font-family: 'Helvetica', monospace;
-    color: #000000;
+    color: #FFFFFF;
     margin: 0;
 }
 
@@ -60,6 +63,45 @@
     font-size: 28px;
     font-weight: bold;
     font-family: 'Helvetica', monospace;
-    color: #000000;
+    color: #FFFFFF;
     margin: 0;
+}
+
+.findtong {
+    color: #E6A04A;
+}
+
+.searchContainer {
+    display: flex;
+    padding: 10px 15px;
+}
+
+.search {
+    position: absolute;
+    top: 170px;
+    left: 18px;          
+    box-sizing: border-box; 
+    width: 90%;
+    height: 55px;
+    padding: 10px 15px;
+    border-radius: 8px;
+    background-color: #1A1A26;
+    border: 1px solid #5e5e5e;
+    padding-left: 50px;
+    color: #FFFFFF;
+}
+
+.search:focus {
+    outline: none;   
+    border-color: #E6A04A;
+}
+
+.music_search {
+    width: 25px;
+    height : 25px;
+    position : absolute;
+    justify-content: Left;
+    padding-top: 5px;
+    padding-left: 15px;
+    top: 180px;
 }

@@ -1,7 +1,7 @@
 .container {
     width: 100%;
     height: 100vh;
-    background-color: #12121A;
+    background: linear-gradient(to bottom, #1b1b27, #0e0e11);
     display: flex;
     flex-direction: column;
 }
@@ -104,4 +104,33 @@
     padding-top: 5px;
     padding-left: 15px;
     top: 180px;
+}
+
+.boxcontainer{
+    display: flex;
+    position: absolute;
+    top: 250px;
+    left: 20px;
+    gap: 10px;
+    flex-wrap: wrap;
+    width: 350px;
+}
+
+.guitar, .cajon, .piano, .drum {
+    width: 170px;
+    height: 200px;
+    background-color: #1A1A26;
+    border-radius: 8px;
+    border: 1px solid #5e5e5e;
+}
+
+.guitar:hover, .cajon:hover, .piano:hover, .drum:hover {
+    border-color: #E6A04A;
+    cursor: pointer;
+}
+
+.guitarimg, .cajonimg, .pianoimg, .drumimg {
+    width: 150px;
+    height: 150px;
+    object-fit: contain;
 }

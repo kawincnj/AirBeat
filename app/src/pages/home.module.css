@@ -1,6 +1,6 @@
 .container {
     width: 100%;
-    height: 100vh;
+    height: 100%;
     background: linear-gradient(to bottom, #1b1b27, #0e0e11);
     display: flex;
     flex-direction: column;
@@ -10,7 +10,7 @@
     display: flex;
     position: absolute;
     top: 20px;
-    left: 20px;
+    left: 22px;
 }
 
 .profile {
@@ -47,7 +47,7 @@
     position: absolute;
     flex-direction: column;
     top: 90px;
-    left: 20px;
+    left: 22px;
     
 }
 
@@ -60,7 +60,7 @@
 }
 
 .find {
-    font-size: 28px;
+    font-size: 25px;
     font-weight: bold;
     font-family: 'Helvetica', monospace;
     color: #FFFFFF;
@@ -79,9 +79,9 @@
 .search {
     position: absolute;
     top: 170px;
-    left: 18px;          
+    left: 22px;          
     box-sizing: border-box; 
-    width: 90%;
+    width: calc(100% - 40px);
     height: 55px;
     padding: 10px 15px;
     border-radius: 8px;
@@ -111,26 +111,58 @@
     position: absolute;
     top: 250px;
     left: 20px;
+    right: 20px;
     gap: 10px;
     flex-wrap: wrap;
-    width: 350px;
+    /* width: 350px; */
+    justify-content: center;
 }
 
-.guitar, .cajon, .piano, .drum {
-    width: 170px;
+.box {
+    /* width: 170px; */
+    width: calc(50% - 10px);
     height: 200px;
     background-color: #1A1A26;
     border-radius: 8px;
     border: 1px solid #5e5e5e;
+    display: flex;              
+    flex-direction: column;     
+    justify-content: flex-start;
 }
 
-.guitar:hover, .cajon:hover, .piano:hover, .drum:hover {
+.box:hover {
     border-color: #E6A04A;
     cursor: pointer;
+    .inner{
+        background-color: #E6A04A;
+    }
+    .nameinstru{
+        color: #E6A04A;
+    }
 }
 
-.guitarimg, .cajonimg, .pianoimg, .drumimg {
-    width: 150px;
-    height: 150px;
+.img {
+    width: 80%;
+    height: 80%;
     object-fit: contain;
+}
+
+.inner {
+    width: 100%;
+    height: 70%;
+    background-color: #2A2A3A;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 5px;
+}
+
+.nameinstru {
+    font-size: 18px;
+    font-weight: bold;
+    font-family: 'Helvetica', monospace;
+    color: #FFFFFF;
+    text-align: center;
+    margin-top: 15px;
 }

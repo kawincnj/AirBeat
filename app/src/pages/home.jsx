@@ -8,7 +8,6 @@ import piano from "../assets/piano.png";
 import drum from "../assets/drum.png";
 
 function HomePage() {
-  const [points, setPoints] = useState([]);
   const [search, setSearch] = useState("");
 
   return (
@@ -18,7 +17,7 @@ function HomePage() {
             <img src={profile} className={styles.profile} />
             <div className={styles.protext}>
                 <span className={styles.name}>GuParn</span>
-                <span className={styles.username}>@guparnairbeat0219</span>
+                <span className={styles.username}>@guparnnotgucode0219</span>
             </div>
         </div>
 
@@ -38,19 +37,29 @@ function HomePage() {
         </div>
 
         <div className={styles.boxcontainer}>
-            <button className={styles.guitar}>
-                <div className={styles.guitarsmall}>
-                    <img src={guitar} className={styles.guitarimg} alt="Guitar"></img>
+            <button className={styles.box}>
+                <div className={styles.inner}>
+                    <img src={guitar} className={styles.img} alt="Guitar"></img>
                 </div>
+                <h1 className={styles.nameinstru}>Guitar</h1>
             </button>
-            <button className={styles.cajon}>
-                <img src={cajon} className={styles.cajonimg} alt="Cajon"></img>
+            <button className={styles.box}>
+                <div className={styles.inner}>
+                    <img src={cajon} className={styles.img} alt="Cajon"></img>
+                </div>
+                <h1 className={styles.nameinstru}>Cajon</h1>
             </button>
-            <button className={styles.piano}>
-                <img src={piano} className={styles.pianoimg} alt="Piano"></img>
+            <button className={styles.box}>
+                <div className={styles.inner}>
+                    <img src={piano} className={styles.img} alt="Piano"></img>
+                </div>
+                <h1 className={styles.nameinstru}>Piano</h1>
             </button>
-            <button className={styles.drum}>
-                <img src={drum} className={styles.drumimg} alt="Drum"></img>
+            <button className={styles.box}>
+                <div className={styles.inner}>
+                    <img src={drum} className={styles.img} alt="Drum"></img>
+                </div>
+                <h1 className={styles.nameinstru}>Drum</h1>
             </button>
         </div>
 

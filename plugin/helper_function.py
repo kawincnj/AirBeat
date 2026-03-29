@@ -61,10 +61,12 @@ class StaticPoseTemplate:
         self.representative_vector = np.median(np.array(self.reference_vectors), axis=0)
 
     # Return [-1, 1]
-    def find_similarity(self, vector):
-        if self.representative_vector is None or vector is None: return 0
-
-        return StaticPoseTemplate.cosine_similarity(self.representative_vector, vector)
+    def find_similarity(self, vector, compare=None):
+        # ใช้ if compare is None แทนการเช็ค list ว่าง
+        target = compare if compare is not None else self.representative_vector
+        if target is None or vector is None: 
+            return 0.0
+        return StaticPoseTemplate.cosine_similarity(target, vector)
 
     def save(self, directory="templates"):
         if self.representative_vector is None:

@@ -68,6 +68,56 @@ class StaticPoseTemplate:
             return 0.0
         return StaticPoseTemplate.cosine_similarity(target, vector)
 
+    @staticmethod
+    def classify(landmarks, template_vectors, template_names, threshold=0.85):
+        """
+        Expert classification helper.
+        Compares landmarks against a list of pre-loaded vectors.
+        """
+        if landmarks is None or not template_vectors:
+            return None
+
+        processed = StaticPoseTemplate.process_landmarks(landmarks)
+        if processed is None:
+            return None
+
+        # Calculate similarity for each template
+        similarities = [
+            StaticPoseTemplate.cosine_similarity(processed, vec)
+            for vec in template_vectors
+        ]
+
+        # Find the best match
+        best_idx = np.argmax(similarities)
+        max_sim = similarities[best_idx]
+
+        if max_sim > threshold:
+            return template_names[best_idx]
+        return None
+
+    @staticmethod
+    def load_templates(filepath):
+        """
+        Expert loader: Reads a JSON file (single or list) 
+        and returns (names, vectors).
+        """
+        names = []
+        vectors = []
+        try:
+            with open(filepath, "r") as file:
+                data = json.load(file)
+                # Support both a list of templates or a single template dictionary
+                items = data if isinstance(data, list) else [data]
+                
+                for item in items:
+                    names.append(item["name"])
+                    vectors.append(np.array(item["representative_vector"]).flatten())
+            
+            return names, vectors
+        except Exception as e:
+            print(f"StaticPoseTemplate Error: Could not load {filepath} -> {e}")
+            return [], []
+
     def save(self, directory="templates"):
         if self.representative_vector is None:
             self.calculate_representative_vector()

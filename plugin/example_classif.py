@@ -12,7 +12,7 @@ if project_root not in sys.path:
 from plugin.hand_tracker import ThreadedHandTracker
 import plugin.helper_function as hp
 
-template_path = os.path.join(project_root, "templates", "Close_Open_Hand.json")
+template_path = os.path.join(project_root, "templates", "up_down.json")
 template_names = []
 template_matrix = []
 

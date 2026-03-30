@@ -23,8 +23,8 @@ SIMILARITY_THRESHOLD = 0.60
 
 def run_cajon():
     # Pre-load Cajon sounds
-    sound_manager.load_sound("cajon_on", r"/home/winkawin2552/code/AirBeat/python_logic_instruments/sounds/cajon_sound/cajon-off.wav")
-    sound_manager.load_sound("cajon_off", r"/home/winkawin2552/code/AirBeat/python_logic_instruments/sounds/cajon_sound/cajon-on.wav")
+    sound_manager.load_sound("cajon_on", r"D:\CODING\AirBeat\python_logic_instruments\sounds\cajon_sound\cajon-on.wav")
+    sound_manager.load_sound("cajon_off", r"D:\CODING\AirBeat\python_logic_instruments\sounds\cajon_sound\cajon-off.wav")
 
     tracker = ThreadedHandTracker(min_detection_confidence=0.3, min_tracking_confidence=0.7)
 
@@ -52,9 +52,9 @@ def run_cajon():
                 if right_prev_up and not is_currently_up:
                     wrist_y = int(right_hand.landmark[1].y * h)
                     if wrist_y < Y_separate:
-                        sound_manager.play("cajon_off")
-                    else:
                         sound_manager.play("cajon_on")
+                    else:
+                        sound_manager.play("cajon_off")
 
                 right_prev_up = is_currently_up
                 tracker.draw_landmarks(frame, right_hand)
@@ -70,9 +70,9 @@ def run_cajon():
                 if left_prev_up and not is_currently_up:
                     wrist_y = int(left_hand.landmark[1].y * h)
                     if wrist_y < Y_separate:
-                        sound_manager.play("cajon_off")
-                    else:
                         sound_manager.play("cajon_on")
+                    else:
+                        sound_manager.play("cajon_off")
 
                 left_prev_up = is_currently_up
                 tracker.draw_landmarks(frame, left_hand)

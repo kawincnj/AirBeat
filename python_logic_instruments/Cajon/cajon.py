@@ -18,8 +18,8 @@ import python_logic_instruments.Cajon.helper_functions as hf
 
 def run_cajon():
     # Pre-load Cajon sounds
-    sound_manager.load_sound("cajon_on", "python_logic_instruments/sounds/cajon-on.wav")
-    sound_manager.load_sound("cajon_off", "python_logic_instruments/sounds/cajon-off.wav")
+    sound_manager.load_sound("cajon_on", "python_logic_instruments\sounds\cajon_sound\cajon-on.wav")
+    sound_manager.load_sound("cajon_off", "python_logic_instruments\sounds\cajon_sound\cajon-off.wav")
 
     # Initialize Tracker
     tracker = ThreadedHandTracker(min_detection_confidence=0.3, min_tracking_confidence=0.7)

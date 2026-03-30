@@ -1,1 +1,1 @@
-print('kuay parn')
+print("nihao")

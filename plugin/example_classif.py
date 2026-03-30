@@ -4,18 +4,19 @@ import time
 import os
 import sys
 import json
-from plugin.hand_tracker import ThreadedHandTracker
-import plugin.helper_function as hp
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+from plugin.hand_tracker import ThreadedHandTracker
+import plugin.helper_function as hp
+
 template_path = os.path.join(project_root, "templates", "Close_Open_Hand.json")
 template_names = []
 template_matrix = []
 
-SIMILARITY_THRESHOLD = 0.88
+SIMILARITY_THRESHOLD = 0.60
 
 try:
     with open(template_path, "r") as file:

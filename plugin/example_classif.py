@@ -4,21 +4,31 @@ import time
 import os
 import sys
 import json
+from plugin.hand_tracker import ThreadedHandTracker
+import plugin.helper_function as hp
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from plugin.hand_tracker import ThreadedHandTracker
-import plugin.helper_function as hp
-
 template_path = os.path.join(project_root, "templates", "Close_Open_Hand.json")
+template_names = []
+template_matrix = []
+
+SIMILARITY_THRESHOLD = 0.88
+
 try:
     with open(template_path, "r") as file:
-        ref_vector = json.load(file)
+        ref_data = json.load(file)
+        for item in ref_data:
+            template_names.append(item["name"])
+            vector = np.array(item["representative_vector"]).flatten()
+            template_matrix.append(vector)
+    
+    print(f"Loaded {len(template_names)} templates: {template_names}")
 except Exception as e:
-    print(f"Error loading template: {e}")
-    ref_vector = []
+    print(f"Error preparing templates: {e}")
+    template_matrix = []
 
 tracker = ThreadedHandTracker(min_detection_confidence=0.7, min_tracking_confidence=0.7)
 
@@ -34,25 +44,27 @@ try:
         tracker.draw_landmarks(frame, right_hand)
 
         is_class = "No Hand"
+        display_color = (200, 200, 200)
         
-        if right_hand:
+        if right_hand and len(template_matrix) > 0:
             processed = hp.StaticPoseTemplate.process_landmarks(right_hand)
             if processed is not None:
-                maxx = -2
-                is_class = "Unknown"
-                
-                for classes in ref_vector:
-                    rep_vec = np.array(classes["representative_vector"])
-                    sim = hp.StaticPoseTemplate.cosine_similarity(rep_vec, processed)
-                    
-                    if sim > maxx:
-                        maxx = sim
-                        if sim > 0.8:
-                            is_class = f"{classes['name']} ({sim:.2f})"
-                        else:
-                            is_class = f"Low Match ({sim:.2f})"
+                similarities = []
+                for vec in template_matrix:
+                    sim = hp.StaticPoseTemplate.cosine_similarity(processed, vec)
+                    similarities.append(sim)
 
-        cv2.putText(frame, is_class, (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                best_idx = np.argmax(similarities)
+                max_sim = similarities[best_idx]
+                    
+                if max_sim > SIMILARITY_THRESHOLD:
+                    is_class = f"{template_names[best_idx]} ({max_sim:.2f})"
+                    display_color = (0, 255, 0)
+                else:
+                    is_class = f"Unknown ({max_sim:.2f})"
+                    display_color = (0, 0, 255)
+
+        cv2.putText(frame, is_class, (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 1, display_color, 2)
 
         cv2.imshow("Hand Posture Classifier", frame)
         key = cv2.waitKey(1)

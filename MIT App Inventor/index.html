@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirBeat - Instrument Selector</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 { margin-bottom: 2rem; }
+        .menu {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        a {
+            background-color: #333;
+            color: white;
+            text-decoration: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            text-align: center;
+            transition: background 0.3s;
+        }
+        a:hover { background-color: #555; }
+    </style>
+</head>
+<body>
+    <h1>AirBeat</h1>
+    <div class="menu">
+        <a href="instruments/cajon/index.html">Cajon</a>
+        <span style="color: #666;">More instruments coming soon...</span>
+    </div>
+</body>
+</html>

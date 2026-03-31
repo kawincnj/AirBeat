@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirBeat - Cajon</title>
+    
+    <!-- MediaPipe Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+    <!-- Shared Core (Mirrors Python plugin/) -->
+    <script src="../../shared/pose_classifier.js"></script>
+    <script src="../../shared/sound_manager.js"></script>
+
+    <!-- Instrument Specific (Mirrors python_logic_instruments/) -->
+    <script src="cajon.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; background-color: #000; color: #fff; overflow: hidden; font-family: sans-serif; }
+        #container { position: relative; width: 100vw; height: 100vh; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+        video { display: none; }
+        #status { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; z-index: 10; pointer-events: none; }
+        .hand-label { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+        .up { color: #00ff00; }
+        .down { color: #ff0000; }
+        .none { color: #888; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; cursor: pointer; }
+        #start-btn { padding: 15px 40px; font-size: 1.5rem; background: #007bff; color: white; border: none; border-radius: 30px; cursor: pointer; }
+        #controls { position: absolute; bottom: 20px; right: 20px; z-index: 10; }
+        .tool-btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid white; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        #debug-log { font-size: 10px; color: #f00; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div id="overlay">
+        <h1>🥁 AirBeat Cajon</h1>
+        <p>Move hand UP then DOWN to play</p>
+        <button id="start-btn">TAP TO START</button>
+        <div id="overlay-status" style="margin-top: 20px; color: #aaa;"></div>
+    </div>
+
+    <div id="container">
+        <video id="input_video" playsinline></video>
+        <canvas id="output_canvas"></canvas>
+        <div id="status">
+            <div id="left-status" class="hand-label none">L: NONE</div>
+            <div id="right-status" class="hand-label none">R: NONE</div>
+            <div id="debug-log"></div>
+        </div>
+        <div id="controls">
+            <button class="tool-btn" onclick="toggleMirror()">Flip Camera</button>
+        </div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const leftStatusEl = document.getElementById('left-status');
+        const rightStatusEl = document.getElementById('right-status');
+        const debugLogEl = document.getElementById('debug-log');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('start-btn');
+
+        // Initialize Core Modules
+        const soundManager = new SoundManager();
+        const classifier = new PoseClassifier();
+        const instrument = new CajonInstrument(soundManager, classifier);
+
+        let isMirrored = true;
+        function toggleMirror() { isMirrored = !isMirrored; }
+
+        startBtn.addEventListener('click', async () => {
+            startBtn.innerText = "Loading...";
+            await instrument.setup();
+            overlay.style.display = 'none';
+        });
+
+        function onResults(results) {
+            try {
+                canvasCtx.save();
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                
+                if (isMirrored) {
+                    canvasCtx.translate(canvasElement.width, 0);
+                    canvasCtx.scale(-1, 1);
+                }
+                
+                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+                // Let the instrument draw its UI (e.g. center line)
+                instrument.drawInstrument(canvasCtx, canvasElement.width, canvasElement.height);
+
+                let leftStatus = "NONE";
+                let rightStatus = "NONE";
+
+                if (results.multiHandLandmarks && results.multiHandedness) {
+                    for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                        const landmarks = results.multiHandLandmarks[i];
+                        const rawLabel = results.multiHandedness[i].label;
+                        
+                        // Fix mirroring for L/R labels
+                        const handedness = isMirrored ? (rawLabel === "Right" ? "Left" : "Right") : rawLabel;
+
+                        // Delegate logic to instrument
+                        const status = instrument.processHand(landmarks, handedness);
+                        
+                        if (handedness === "Right") rightStatus = status;
+                        else leftStatus = status;
+
+                        // Common Drawing
+                        if (window.drawConnectors && window.HAND_CONNECTIONS) {
+                            window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
+                        }
+                        if (window.drawLandmarks) {
+                            window.drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 2});
+                        }
+                    }
+                }
+
+                canvasCtx.restore();
+
+                // Update UI
+                leftStatusEl.innerText = `L: ${leftStatus}`;
+                leftStatusEl.className = `hand-label ${leftStatus.toLowerCase()}`;
+                rightStatusEl.innerText = `R: ${rightStatus}`;
+                rightStatusEl.className = `hand-label ${rightStatus.toLowerCase()}`;
+
+                // Bridge to App Inventor
+                if (window.AppInventor && window.AppInventor.setWebViewString) {
+                    window.AppInventor.setWebViewString(JSON.stringify({
+                        instrument: "cajon", left: leftStatus, right: rightStatus
+                    }));
+                }
+            } catch (err) {
+                debugLogEl.innerText = "Error: " + err.message;
+                console.error(err);
+                canvasCtx.restore();
+            }
+        }
+
+        // MediaPipe Setup
+        const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({image: videoElement}); }, width: 1280, height: 720 });
+        camera.start();
+
+        function resize() { canvasElement.width = window.innerWidth; canvasElement.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+    </script>
+</body>
+</html>

@@ -22,9 +22,12 @@ template_names, template_matrix = hp.StaticPoseTemplate.load_templates(template_
 SIMILARITY_THRESHOLD = 0.60
 
 def run_cajon():
-    # Pre-load Cajon sounds
-    sound_manager.load_sound("cajon_on", r"D:\CODING\AirBeat\python_logic_instruments\sounds\cajon_sound\cajon-on.wav")
-    sound_manager.load_sound("cajon_off", r"D:\CODING\AirBeat\python_logic_instruments\sounds\cajon_sound\cajon-off.wav")
+    # Pre-load Cajon sounds using portable paths
+    sound_on_path = os.path.join(project_root, "python_logic_instruments", "sounds", "cajon_sound", "cajon-on.wav")
+    sound_off_path = os.path.join(project_root, "python_logic_instruments", "sounds", "cajon_sound", "cajon-off.wav")
+    
+    sound_manager.load_sound("cajon_on", sound_on_path)
+    sound_manager.load_sound("cajon_off", sound_off_path)
 
     tracker = ThreadedHandTracker(min_detection_confidence=0.3, min_tracking_confidence=0.7)
 

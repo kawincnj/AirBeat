@@ -73,10 +73,24 @@
         let isMirrored = true;
         function toggleMirror() { isMirrored = !isMirrored; }
 
+        // Move camera definition here, but DON'T start yet
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 640,
+            height: 480
+        });
+
         startBtn.addEventListener('click', async () => {
-            startBtn.innerText = "Loading...";
-            await instrument.setup();
-            overlay.style.display = 'none';
+            try {
+                startBtn.innerText = "Starting...";
+                await instrument.setup();
+                await camera.start();
+                overlay.style.display = 'none';
+            } catch (err) {
+                console.error(err);
+                debugLogEl.innerText = "Camera Start Error: " + err.message;
+                startBtn.innerText = "Error - check log";
+            }
         });
 
         function onResults(results) {
@@ -146,9 +160,6 @@
         const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
         hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         hands.onResults(onResults);
-
-        const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({image: videoElement}); }, width: 1280, height: 720 });
-        camera.start();
 
         function resize() { canvasElement.width = window.innerWidth; canvasElement.height = window.innerHeight; }
         window.addEventListener('resize', resize);

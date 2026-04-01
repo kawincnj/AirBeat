@@ -153,6 +153,34 @@
         function resize() { canvasElement.width = window.innerWidth; canvasElement.height = window.innerHeight; }
         window.addEventListener('resize', resize);
         resize();
+
+        // ─── Dragging Logic ───────────────────────────────────────────────
+        function handlePointerDown(e) {
+            const y = (e.touches ? e.touches[0].clientY : e.clientY) / window.innerHeight;
+            // If clicking near the line (within 5% range)
+            if (Math.abs(y - instrument.ySeparate) < 0.05) {
+                instrument.isDragging = true;
+            }
+        }
+
+        function handlePointerMove(e) {
+            if (instrument.isDragging) {
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) / window.innerHeight;
+                instrument.setYSeparate(y);
+            }
+        }
+
+        function handlePointerUp() {
+            instrument.isDragging = false;
+        }
+
+        canvasElement.addEventListener('mousedown', handlePointerDown);
+        window.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('mouseup', handlePointerUp);
+
+        canvasElement.addEventListener('touchstart', handlePointerDown);
+        window.addEventListener('touchmove', handlePointerMove, { passive: false });
+        window.addEventListener('touchend', handlePointerUp);
     </script>
 </body>
 </html>

@@ -6,7 +6,7 @@ class CajonInstrument {
   constructor(soundManager, poseClassifier) {
     this.soundManager = soundManager;
     this.poseClassifier = poseClassifier;
-    this.ySeparate = 0.5; // Normalized center line
+    this.ySeparate = 0.7; // Normalized center line
     this.isDragging = false;
 
     // Track previous states per hand

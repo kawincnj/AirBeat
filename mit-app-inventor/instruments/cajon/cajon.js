@@ -4,56 +4,55 @@
  */
 class CajonInstrument {
   constructor(soundManager, poseClassifier) {
-      this.soundManager = soundManager;
-      this.poseClassifier = poseClassifier;
-      this.ySeparate = 0.5; // Normalized center line
-      this.isDragging = false;
+    this.soundManager = soundManager;
+    this.poseClassifier = poseClassifier;
+    this.ySeparate = 0.5; // Normalized center line
+    this.isDragging = false;
 
-      // Track previous states per hand
-      this.leftPrevUp = true;
-      this.rightPrevUp = true;
+    // Track previous states per hand
+    this.leftPrevUp = true;
+    this.rightPrevUp = true;
   }
 
   async setup() {
-      console.log("Setting up Cajon sounds...");
-      await this.soundManager.loadSound('cajon_on', 'sounds/cajon-on.wav');
-      await this.soundManager.loadSound('cajon_off', 'sounds/cajon-off.wav');
+    console.log("Setting up Cajon sounds...");
+    await this.soundManager.loadSound("cajon_on", "sounds/cajon-on.wav");
+    await this.soundManager.loadSound("cajon_off", "sounds/cajon-off.wav");
   }
 
   setYSeparate(y) {
-      // Clamp between 0.1 and 0.9 to keep it on screen
-      this.ySeparate = Math.max(0.1, Math.min(0.9, y));
+    // Clamp between 0.1 and 0.9 to keep it on screen
+    this.ySeparate = Math.max(0.1, Math.min(0.9, y));
   }
 
   drawInstrument(ctx, canvasWidth, canvasHeight) {
-      const yPos = canvasHeight * this.ySeparate;
+    const yPos = canvasHeight * this.ySeparate;
 
-      // Draw the center line
-      ctx.strokeStyle = this.isDragging ? '#ffaa00' : '#4488ff';
-      ctx.lineWidth = this.isDragging ? 5 : 3;
-      ctx.setLineDash(this.isDragging ? [] : [20, 10]);
+    // Draw the center line
+    ctx.strokeStyle = this.isDragging ? "#ffaa00" : "#4488ff";
+    ctx.lineWidth = this.isDragging ? 5 : 3;
+    ctx.setLineDash(this.isDragging ? [] : [20, 10]);
 
-      ctx.beginPath();
-      ctx.moveTo(0, yPos);
-      ctx.lineTo(canvasWidth, yPos);
-      ctx.stroke();
-      ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(0, yPos);
+    ctx.lineTo(canvasWidth, yPos);
+    ctx.stroke();
+    ctx.setLineDash([]);
 
-      // Draw a small "handle" indicator on the right
-      ctx.fillStyle = this.isDragging ? '#ffaa00' : '#4488ff';
-      ctx.beginPath();
-      ctx.arc(canvasWidth - 30, yPos, 10, 0, Math.PI * 2);
-      ctx.fill();
+    // Draw a small "handle" indicator on the right
+    ctx.fillStyle = this.isDragging ? "#ffaa00" : "#4488ff";
+    ctx.beginPath();
+    ctx.arc(canvasWidth - 30, yPos, 10, 0, Math.PI * 2);
+    ctx.fill();
 
-      // Instructions when dragging
-      if (this.isDragging) {
-          ctx.fillStyle = '#ffaa00';
-          ctx.font = 'bold 20px sans-serif';
-          ctx.textAlign = 'right';
-          ctx.fillText('Adjusting Line...', canvasWidth - 50, yPos - 15);
-      }
+    // Instructions when dragging
+    if (this.isDragging) {
+      ctx.fillStyle = "#ffaa00";
+      ctx.font = "bold 20px sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("Adjusting Line...", canvasWidth - 50, yPos - 15);
+    }
   }
-
 
   processHand(landmarks, handedness) {
     const pose = this.poseClassifier.classify(landmarks);

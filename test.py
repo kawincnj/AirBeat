@@ -1,86 +1,25 @@
-import cv2
-import numpy as np
-import time
-import os
-import sys
-import json
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.append(project_root)
-
-from plugin.hand_tracker import ThreadedHandTracker
-from plugin.sound_manager import sound_manager
-import plugin.helper_function as hp
-
-template_path = os.path.join(project_root, "templates", "Close_Open_Hand.json")
-template_names = []
-template_matrix = []
-
-try:
-    with open(template_path, "r") as file:
-        ref_data = json.load(file)
-        for item in ref_data:
-            template_names.append(item["name"])
-
-            vector = np.array(item["representative_vector"]).flatten()
-            template_matrix.append(vector)
-    
-    template_matrix = np.array(template_matrix)
-
-    template_norms = np.linalg.norm(template_matrix, axis=1)
-    print(f"Loaded {len(template_names)} templates: {template_names}")
-except Exception as e:
-    print(f"Error preparing templates: {e}")
-    template_matrix = None
-
-
-tracker = ThreadedHandTracker(min_detection_confidence=0.7, min_tracking_confidence=0.7)
-
-SIMILARITY_THRESHOLD = 0.88
-
-try:
-    while True:
-        frame, left_hand, right_hand = tracker.read()
-
-        if frame is None:
-            time.sleep(0.01)
-            continue
-
-        tracker.draw_landmarks(frame, left_hand)
-        tracker.draw_landmarks(frame, right_hand)
-
-        current_class = "No Hand"
-        display_color = (200, 200, 200)
-
-        if right_hand and template_matrix is not None:
-            processed = hp.StaticPoseTemplate.process_landmarks(right_hand)
-            if processed is not None:
-                hand_vector = processed.flatten()
-                
-                dot_products = np.dot(template_matrix, hand_vector)
-                hand_norm = np.linalg.norm(hand_vector)
-                similarities = dot_products / (template_norms * hand_norm)
-                
-                best_idx = np.argmax(similarities)
-                max_sim = similarities[best_idx]
-                
-                if max_sim > SIMILARITY_THRESHOLD:
-                    current_class = template_names[best_idx]
-                    display_color = (0, 255, 0)
-                    
-                else:
-                    current_class = "Unknown"
-                    display_color = (0, 0, 255)
-
-        cv2.putText(frame, f"Posture: {current_class}", (10, 450), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, display_color, 2)
-
-        cv2.imshow("High-Speed Hand Posture Trigger", frame)
-        key = cv2.waitKey(1)
-        if key == 27:
-            break
-
-finally:
-    tracker.stop()
-    cv2.destroyAllWindows()
+my_2d_list = [
+      [0.0, 0.0, 0.0],
+      [-0.26477275774731746, -0.20950979893326166, -0.10558584042605641],
+      [-0.46374605776903566, -0.5025172938024225, -0.15878006930815453],
+      [-0.5870903828277015, -0.7585532846698064, -0.2067729874939146],
+      [-0.6150883543593764, -0.9906761683646593, -0.2500862344661174],
+      [-0.18661162814668195, -0.976350760550618, -0.04989432307194505],
+      [-0.23758405497532864, -1.3467290374380245, -0.12794749472055483],
+      [-0.27032992949871193, -1.5717523111069105, -0.202425978025699],
+      [-0.288658954127462, -1.7794197304730248, -0.26075824509530166],
+      [-0.012703287331409515, -0.9977668476884589, -0.06539125713894114],
+      [-0.018181021862941654, -1.4169848693047336, -0.1263987513380481],
+      [-0.021926807500262775, -1.681366263646276, -0.19080643271493142],
+      [-0.02277644848444648, -1.913748781122056, -0.24113165204091527],
+      [0.1458158219591914, -0.9293523559575114, -0.10149504648383406],
+      [0.16577746942481808, -1.3070920764713463, -0.17230241347591702],
+      [0.17685618512899026, -1.5384976123162453, -0.22031133255798047],
+      [0.1838474661373852, -1.7540873235534273, -0.25649272816569446],
+      [0.2921657072294718, -0.7894898100268883, -0.14916894600982877],
+      [0.3608237919993418, -1.0542022865723049, -0.21631929174833592],
+      [0.40467447418407665, -1.2311034236517722, -0.24307538007319127],
+      [0.44773430477013193, -1.411661471036844, -0.2618982304452235]
+    ]
+my_1d_list = [item for sublist in my_2d_list for item in sublist]
+print(my_1d_list)

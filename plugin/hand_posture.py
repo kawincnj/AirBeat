@@ -5,12 +5,13 @@ import time
 from hand_tracker import ThreadedHandTracker
 import helper_function as hp
 
-# Initializea
+# Initialize
 tracker = ThreadedHandTracker(min_detection_confidence=0.7, min_tracking_confidence=0.7)
 templates_dir = "templates"
 
 # Templates
 current_template = hp.StaticPoseTemplate("Open_Hand")
+capture_hand_side = "Right" # Default side
 status_msg = "Press 'H' for help"
 msg_expiry = 0
 
@@ -30,9 +31,13 @@ try:
         tracker.draw_landmarks(frame, left_hand)
         tracker.draw_landmarks(frame, right_hand)
 
+        # Determine which hand is the current target
+        target_hand = right_hand if capture_hand_side == "Right" else left_hand
+
         # UI Overlay
         cv2.putText(frame, f"Template: {current_template.name}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         cv2.putText(frame, f"Refs: {len(current_template.reference_vectors)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(frame, f"Target Hand: {capture_hand_side}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
         
         if msg_expiry > 0:
             cv2.putText(frame, status_msg, (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
@@ -41,8 +46,8 @@ try:
             cv2.putText(frame, "Press 'H' for help", (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
 
         # Similarity check if representative vector exists
-        if right_hand and current_template.representative_vector is not None:
-            processed = hp.StaticPoseTemplate.process_landmarks(right_hand)
+        if target_hand and current_template.representative_vector is not None:
+            processed = hp.StaticPoseTemplate.process_landmarks(target_hand)
             sim = current_template.find_similarity(processed)
             color = (0, 255, 0) if sim > 0.99 else (0, 0, 255)
             cv2.putText(frame, f"Similarity: {sim:.3f}", (400, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
@@ -52,7 +57,8 @@ try:
 
         if key == ord('h'):
             print("\n--- Help ---")
-            print("A: Add current right hand pose as reference")
+            print("T: Toggle Target Hand (Left/Right)")
+            print("A: Add current target hand pose as reference")
             print("W: Calculate representative vector (median)")
             print("S: Save template to disk")
             print("E: Clear references")
@@ -60,12 +66,16 @@ try:
             print("ESC: Exit")
             set_status("Help printed to console", 90)
 
+        elif key == ord('t'):
+            capture_hand_side = "Left" if capture_hand_side == "Right" else "Right"
+            set_status(f"Target switched to {capture_hand_side} hand", 60)
+
         elif key == ord('a'):
-            if right_hand:
-                current_template.add_reference(right_hand)
-                set_status(f"Added ref {len(current_template.reference_vectors)}", 30)
+            if target_hand:
+                current_template.add_reference(target_hand)
+                set_status(f"Added ref {len(current_template.reference_vectors)} from {capture_hand_side} hand", 30)
             else:
-                set_status("No right hand detected!", 60)
+                set_status(f"No {capture_hand_side} hand detected!", 60)
 
         elif key == ord('w'):
             if current_template.reference_vectors:
@@ -85,8 +95,6 @@ try:
             set_status("References cleared", 60)
 
         elif key == ord('n'):
-            # Using input() here might block the camera thread from updating UI 
-            # but ThreadedHandTracker will keep capturing in background
             new_name = input("Enter new template name: ")
             current_template.name = new_name
             set_status(f"Name set to: {new_name}", 60)

@@ -1,1 +1,0 @@
-    # frame = cv2.flip(frame, 1) # Mirror for natural interaction

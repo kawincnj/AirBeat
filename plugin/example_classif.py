@@ -5,18 +5,21 @@ import os
 import sys
 import json
 
+# --- SMART PATH FIX ---
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.append(project_root)
+# ----------------------
 
 from plugin.hand_tracker import ThreadedHandTracker
 import plugin.helper_function as hp
 
-template_path = os.path.join(project_root, "templates", "up_down.json")
+template_path = os.path.join(project_root, "templates", "ukulele.json")
 template_names = []
 template_matrix = []
 
 SIMILARITY_THRESHOLD = 0.60
+capture_hand_side = "Right" # Default side
 
 try:
     with open(template_path, "r") as file:
@@ -44,11 +47,14 @@ try:
         tracker.draw_landmarks(frame, left_hand)
         tracker.draw_landmarks(frame, right_hand)
 
-        is_class = "No Hand"
+        # Determine which hand is the current target
+        target_hand = right_hand if capture_hand_side == "Right" else left_hand
+
+        is_class = f"No {capture_hand_side} Hand"
         display_color = (200, 200, 200)
         
-        if right_hand and len(template_matrix) > 0:
-            processed = hp.StaticPoseTemplate.process_landmarks(right_hand)
+        if target_hand and len(template_matrix) > 0:
+            processed = hp.StaticPoseTemplate.process_landmarks(target_hand)
             if processed is not None:
                 similarities = []
                 for vec in template_matrix:
@@ -65,11 +71,16 @@ try:
                     is_class = f"Unknown ({max_sim:.2f})"
                     display_color = (0, 0, 255)
 
+        # UI Overlay
+        cv2.putText(frame, f"Target: {capture_hand_side} (Press 'T' to swap)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
         cv2.putText(frame, is_class, (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 1, display_color, 2)
 
         cv2.imshow("Hand Posture Classifier", frame)
-        key = cv2.waitKey(1)
-        if key == 27:
+        key = cv2.waitKey(1) & 0xFF
+        
+        if key == ord('t'):
+            capture_hand_side = "Left" if capture_hand_side == "Right" else "Right"
+        elif key == 27:
             break
 
 finally:

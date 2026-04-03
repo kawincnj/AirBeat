@@ -20,19 +20,19 @@ import pygame
 keys = ["C4","D4","E4","F4","G4","A4","B4","C5","D5","E5","F5","G5","A5"]
 
 # Load sound files (convert note names to lowercase for file lookup)
-# C4 -> c4.mp3 or c4.wav, D4 -> d4.mp3 or d4.wav, etc.
+# C4 -> c4.mp3 or c4.ogg, D4 -> d4.mp3 or d4.ogg, etc.
 sound_dir = os.path.join(os.path.dirname(__file__), "sound_piano")
 print(f"Loading sounds from: {sound_dir}")
 for note in keys:
-    # Try MP3 first, then WAV
-    for ext in [".mp3", ".wav"]:
+    # Try MP3 first, then OGG
+    for ext in [".mp3", ".ogg"]:
         sound_file = os.path.join(sound_dir, f"{note.lower()}{ext}")
         if os.path.exists(sound_file) and os.path.getsize(sound_file) > 0:
             sound_manager.load_sound(note, sound_file)
             print(f"✓ Loaded {note} ({ext})")
             break
     else:
-        print(f"✗ Missing: {note.lower()}.mp3 or .wav")
+        print(f"✗ Missing: {note.lower()}.mp3 or .ogg")
 
 # Track previous state to detect note on/off transitions
 previous_pressed_indices = set()

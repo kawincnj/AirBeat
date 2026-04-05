@@ -46,9 +46,10 @@ class StaticPoseTemplate:
 # --- NEW: AUDIO SETUP FUNCTION ---
 def setup_audio():
     """Loads all chord sounds from the assets folder."""
-    audio_path = os.path.join(project_root, "assets", "sounds")
+    audio_path = os.path.join(os.path.dirname(__file__), "guitar_sound")
     if os.path.exists(audio_path):
-        sound_manager.load_directory(audio_path)
+        # Assuming your sound manager has this method
+        sound_manager.load_directory(audio_path) 
         print(f"Audio system ready. Loaded sounds from: {audio_path}")
     else:
         print(f"Warning: Audio directory not found at {audio_path}")
@@ -80,7 +81,7 @@ def main():
     strum_line_y = 300
     templates = []
     current_fret, current_string, current_anchor = 1,1,8
-    template_dir = os.path.join(project_root, "templates")
+    template_dir = os.path.join(project_root, "templates", "guitar chords")
 
     # Smoothing variables for the green overlay
     smooth_fx, smooth_fy = -1, -1

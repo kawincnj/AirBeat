@@ -191,7 +191,7 @@ def main():
                                       "string": int(Counter(strs).most_common(1)[0][0]),
                                       "anchor_idx": int(Counter(anks).most_common(1)[0][0])}
                         with open(f"templates/{name}.json", 'w') as f: json.dump(final_data, f)
-                        reload_lib()
+                        # reload_lib()
             elif key == 27: break
     finally:
         tracker.stop()

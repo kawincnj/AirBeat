@@ -71,7 +71,7 @@ def draw_fretboard_ui(frame, box):
 
 def draw_strum_zone(frame, y_line, is_active):
     color = (0, 255, 255) if is_active else (100, 100, 100)
-    cv2.line(frame, (400, y_line), (frame.shape[1] - 20, y_line), color, 3)
+    cv2.line(frame, (360, y_line), (frame.shape[1] - 20, y_line), color, 3)
 
 def main():
     tracker = ThreadedHandTracker(min_detection_confidence=0.7)

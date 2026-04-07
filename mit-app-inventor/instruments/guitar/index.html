@@ -18,16 +18,16 @@
     <script src="./guitar.js"></script>
 
     <style>
-        body { margin: 0; padding: 0; background-color: #000; color: #fff; overflow: hidden; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; }
-        #container { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-        canvas { background-color: #111; max-width: 100%; max-height: 100%; }
+        body { margin: 0; padding: 0; background-color: #000; color: #fff; overflow: hidden; font-family: sans-serif; height: 100vh; width: 100vw; }
+        #container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
         video { display: none; }
         #status { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; z-index: 10; pointer-events: none; }
         .hand-label { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
         #overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
         #start-btn { padding: 20px 50px; font-size: 1.8rem; background: #007bff; color: white; border: none; border-radius: 40px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0,123,255,0.4); }
         #start-btn:hover { background: #0056b3; transform: scale(1.05); }
-        #controls { position: absolute; bottom: 20px; right: 20px; z-index: 10; }
+        #controls { position: absolute; bottom: 30%; right: 20px; z-index: 10; display: flex; flex-direction: column; gap: 10px; }
         .tool-btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid white; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
         #debug-log { font-size: 10px; color: #f00; margin-top: 5px; }
     </style>
@@ -48,6 +48,7 @@
             <div id="debug-log"></div>
         </div>
         <div id="controls">
+            <button class="tool-btn" onclick="toggleFullscreen()">Fullscreen</button>
             <button class="tool-btn" onclick="toggleMirror()">Flip Camera</button>
         </div>
     </div>
@@ -72,6 +73,16 @@
             instrument.setMirror(isMirrored);
         }
 
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.warn(err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
         const camera = new Camera(videoElement, {
             onFrame: async () => { await hands.send({image: videoElement}); },
             width: 640,
@@ -84,6 +95,7 @@
                 await instrument.setup();
                 await camera.start();
                 overlay.style.display = 'none';
+                resize();
             } catch (err) {
                 console.error(err);
                 debugLogEl.innerText = "Error: " + err.message;
@@ -93,36 +105,60 @@
 
         function onResults(results) {
             try {
-                if (canvasElement.width !== results.image.width || canvasElement.height !== results.image.height) {
-                    canvasElement.width = results.image.width;
-                    canvasElement.height = results.image.height;
-                    resize();
+                const cW = canvasElement.width;
+                const cH = canvasElement.height;
+                const vW = results.image.width;
+                const vH = results.image.height;
+
+                const vAspect = vW / vH;
+                const cAspect = cW / cH;
+                let drawW, drawH, xOffset, yOffset;
+
+                if (cAspect > vAspect) {
+                    drawW = cW;
+                    drawH = cW / vAspect;
+                    xOffset = 0;
+                    yOffset = (cH - drawH) / 2;
+                } else {
+                    drawH = cH;
+                    drawW = cH * vAspect;
+                    xOffset = (cW - drawW) / 2;
+                    yOffset = 0;
                 }
 
                 canvasCtx.save();
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                canvasCtx.clearRect(0, 0, cW, cH);
                 
                 if (isMirrored) {
-                    canvasCtx.translate(canvasElement.width, 0);
+                    canvasCtx.translate(cW, 0);
                     canvasCtx.scale(-1, 1);
+                    canvasCtx.drawImage(results.image, xOffset, yOffset, drawW, drawH);
+                } else {
+                    canvasCtx.drawImage(results.image, xOffset, yOffset, drawW, drawH);
                 }
-                
-                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
                 let currentChord = "NONE";
 
                 if (results.multiHandLandmarks && results.multiHandedness) {
                     for (let i = 0; i < results.multiHandLandmarks.length; i++) {
-                        const landmarks = results.multiHandLandmarks[i];
+                        const rawLandmarks = results.multiHandLandmarks[i];
                         const rawLabel = results.multiHandedness[i].label;
                         const handedness = isMirrored ? (rawLabel === "Right" ? "Left" : "Right") : rawLabel;
 
-                        currentChord = instrument.processHand(landmarks, handedness);
+                        const mappedLandmarks = rawLandmarks.map(p => {
+                            return {
+                                x: (p.x * drawW + xOffset) / cW,
+                                y: (p.y * drawH + yOffset) / cH,
+                                z: p.z
+                            };
+                        });
+
+                        currentChord = instrument.processHand(mappedLandmarks, handedness);
                     }
                 }
 
                 canvasCtx.restore();
-                instrument.drawInstrument(canvasCtx, canvasElement.width, canvasElement.height);
+                instrument.drawInstrument(canvasCtx, cW, cH);
 
                 chordStatusEl.innerText = `CHORD: ${currentChord}`;
 
@@ -142,18 +178,8 @@
         hands.onResults(onResults);
 
         function resize() {
-            const aspect = 640 / 480;
-            const winW = window.innerWidth;
-            const winH = window.innerHeight;
-            const winAspect = winW / winH;
-
-            if (winAspect > aspect) {
-                canvasElement.style.height = '100vh';
-                canvasElement.style.width = (100 * aspect) + 'vh';
-            } else {
-                canvasElement.style.width = '100vw';
-                canvasElement.style.height = (100 / aspect) + 'vw';
-            }
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
         }
         window.addEventListener('resize', resize);
         resize();

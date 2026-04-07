@@ -18,17 +18,18 @@
     <script src="./piano.js"></script>
 
     <style>
-        body { margin: 0; padding: 0; background-color: #000; color: #fff; overflow: hidden; font-family: sans-serif; }
-        #container { position: relative; width: 100vw; height: 100vh; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+        body { margin: 0; padding: 0; background-color: #000; color: #fff; overflow: hidden; font-family: sans-serif; height: 100vh; width: 100vw; }
+        #container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
         video { display: none; }
         #status { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; z-index: 10; pointer-events: none; }
         .hand-label { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
         .playing { color: #00ff00; }
         .none { color: #888; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; cursor: pointer; }
-        #start-btn { padding: 15px 40px; font-size: 1.5rem; background: #007bff; color: white; border: none; border-radius: 30px; cursor: pointer; }
-        #controls { position: absolute; bottom: 20px; right: 20px; z-index: 10; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
+        #start-btn { padding: 20px 50px; font-size: 1.8rem; background: #007bff; color: white; border: none; border-radius: 40px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0,123,255,0.4); }
+        #start-btn:hover { background: #0056b3; transform: scale(1.05); }
+        #controls { position: absolute; bottom: 30%; right: 20px; z-index: 10; display: flex; flex-direction: column; gap: 10px; }
         .tool-btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid white; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
         #debug-log { font-size: 10px; color: #f00; margin-top: 5px; }
     </style>
@@ -36,9 +37,9 @@
 <body>
     <div id="overlay">
         <h1>🎹 AirBeat Piano</h1>
-        <p>Touch the keys with your fingertips to play</p>
+        <p style="margin-bottom: 30px; color: #ccc;">Touch the keys with your fingertips to play</p>
         <button id="start-btn">TAP TO START</button>
-        <div id="overlay-status" style="margin-top: 20px; color: #aaa;"></div>
+        <div id="overlay-status" style="margin-top: 20px; color: #888;">Ensure camera access is allowed</div>
     </div>
 
     <div id="container">
@@ -50,6 +51,7 @@
             <div id="debug-log"></div>
         </div>
         <div id="controls">
+            <button class="tool-btn" onclick="toggleFullscreen()">Fullscreen</button>
             <button class="tool-btn" onclick="toggleMirror()">Flip Camera</button>
         </div>
     </div>
@@ -64,7 +66,6 @@
         const overlay = document.getElementById('overlay');
         const startBtn = document.getElementById('start-btn');
 
-        // Initialize Core Modules
         const soundManager = new SoundManager();
         const instrument = new PianoInstrument(soundManager);
 
@@ -74,6 +75,16 @@
         function toggleMirror() { 
             isMirrored = !isMirrored; 
             instrument.setMirror(isMirrored);
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.warn(err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
         }
 
         const camera = new Camera(videoElement, {
@@ -88,6 +99,7 @@
                 await instrument.setup();
                 await camera.start();
                 overlay.style.display = 'none';
+                resize();
             } catch (err) {
                 console.error(err);
                 debugLogEl.innerText = "Error: " + err.message;
@@ -97,52 +109,70 @@
 
         function onResults(results) {
             try {
-                canvasCtx.save();
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                
-                // MIRRORING LOGIC:
-                // We mirror the WHOLE context before drawing the video.
-                // This makes drawing easier, but we have to handle text separately in the instrument.
-                if (isMirrored) {
-                    canvasCtx.translate(canvasElement.width, 0);
-                    canvasCtx.scale(-1, 1);
+                const cW = canvasElement.width;
+                const cH = canvasElement.height;
+                const vW = results.image.width;
+                const vH = results.image.height;
+
+                const vAspect = vW / vH;
+                const cAspect = cW / cH;
+                let drawW, drawH, xOffset, yOffset;
+
+                if (cAspect > vAspect) {
+                    drawW = cW;
+                    drawH = cW / vAspect;
+                    xOffset = 0;
+                    yOffset = (cH - drawH) / 2;
+                } else {
+                    drawH = cH;
+                    drawW = cH * vAspect;
+                    xOffset = (cW - drawW) / 2;
+                    yOffset = 0;
                 }
+
+                canvasCtx.save();
+                canvasCtx.clearRect(0, 0, cW, cH);
                 
-                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+                if (isMirrored) {
+                    canvasCtx.translate(cW, 0);
+                    canvasCtx.scale(-1, 1);
+                    canvasCtx.drawImage(results.image, xOffset, yOffset, drawW, drawH);
+                } else {
+                    canvasCtx.drawImage(results.image, xOffset, yOffset, drawW, drawH);
+                }
 
                 let leftStatus = "NONE";
                 let rightStatus = "NONE";
 
                 if (results.multiHandLandmarks && results.multiHandedness) {
                     for (let i = 0; i < results.multiHandLandmarks.length; i++) {
-                        const landmarks = results.multiHandLandmarks[i];
+                        const rawLandmarks = results.multiHandLandmarks[i];
                         const rawLabel = results.multiHandedness[i].label;
                         const handedness = isMirrored ? (rawLabel === "Right" ? "Left" : "Right") : rawLabel;
 
-                        const status = instrument.processHand(landmarks, handedness);
-                        
+                        const mappedLandmarks = rawLandmarks.map(p => {
+                            return {
+                                x: (p.x * drawW + xOffset) / cW,
+                                y: (p.y * drawH + yOffset) / cH,
+                                z: p.z
+                            };
+                        });
+
+                        const status = instrument.processHand(mappedLandmarks, handedness);
                         if (handedness === "Right") rightStatus = status;
                         else leftStatus = status;
-
-                        // Hand drawing removed for a cleaner look
                     }
                 }
 
-                // Call updateSounds once per frame after both hands processed
                 instrument.updateSounds();
-
-                // Draw the piano keyboard UI (inside the potentially mirrored context)
-                instrument.drawInstrument(canvasCtx, canvasElement.width, canvasElement.height);
-
+                instrument.drawInstrument(canvasCtx, cW, cH);
                 canvasCtx.restore();
 
-                // Update UI text (always normal)
                 leftStatusEl.innerText = `L: ${leftStatus}`;
                 leftStatusEl.className = `hand-label ${leftStatus.toLowerCase()}`;
                 rightStatusEl.innerText = `R: ${rightStatus}`;
                 rightStatusEl.className = `hand-label ${rightStatus.toLowerCase()}`;
 
-                // Bridge to App Inventor
                 if (window.AppInventor && window.AppInventor.setWebViewString) {
                     window.AppInventor.setWebViewString(JSON.stringify({
                         instrument: "piano", left: leftStatus, right: rightStatus
@@ -150,7 +180,6 @@
                 }
             } catch (err) {
                 debugLogEl.innerText = "Error: " + err.message;
-                console.error(err);
                 canvasCtx.restore();
             }
         }
@@ -159,7 +188,10 @@
         hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         hands.onResults(onResults);
 
-        function resize() { canvasElement.width = window.innerWidth; canvasElement.height = window.innerHeight; }
+        function resize() {
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
+        }
         window.addEventListener('resize', resize);
         resize();
     </script>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirBeat - Guitar</title>
+    
+    <!-- MediaPipe Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+    <!-- Shared Core -->
+    <script src="../../shared/pose_classifier.js"></script>
+    <script src="../../shared/sound_manager.js"></script>
+
+    <!-- Instrument Specific -->
+    <script src="./guitar.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; background-color: #000; color: #fff; overflow: hidden; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; }
+        #container { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        canvas { background-color: #111; max-width: 100%; max-height: 100%; }
+        video { display: none; }
+        #status { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; z-index: 10; pointer-events: none; }
+        .hand-label { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
+        #start-btn { padding: 20px 50px; font-size: 1.8rem; background: #007bff; color: white; border: none; border-radius: 40px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0,123,255,0.4); }
+        #start-btn:hover { background: #0056b3; transform: scale(1.05); }
+        #controls { position: absolute; bottom: 20px; right: 20px; z-index: 10; }
+        .tool-btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid white; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        #debug-log { font-size: 10px; color: #f00; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div id="overlay">
+        <h1>🎸 AirBeat Guitar</h1>
+        <p style="margin-bottom: 30px; color: #ccc;">Left Hand: Fretboard | Right Hand: Strum</p>
+        <button id="start-btn">TAP TO START</button>
+        <div id="overlay-status" style="margin-top: 20px; color: #888;">Ensure camera access is allowed</div>
+    </div>
+
+    <div id="container">
+        <video id="input_video" playsinline></video>
+        <canvas id="output_canvas"></canvas>
+        <div id="status">
+            <div id="chord-status" class="hand-label">CHORD: NONE</div>
+            <div id="debug-log"></div>
+        </div>
+        <div id="controls">
+            <button class="tool-btn" onclick="toggleMirror()">Flip Camera</button>
+        </div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const chordStatusEl = document.getElementById('chord-status');
+        const debugLogEl = document.getElementById('debug-log');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('start-btn');
+
+        const soundManager = new SoundManager();
+        const instrument = new GuitarInstrument(soundManager);
+
+        let isMirrored = true;
+        instrument.setMirror(isMirrored);
+
+        function toggleMirror() { 
+            isMirrored = !isMirrored; 
+            instrument.setMirror(isMirrored);
+        }
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 640,
+            height: 480
+        });
+
+        startBtn.addEventListener('click', async () => {
+            try {
+                startBtn.innerText = "Initializing...";
+                await instrument.setup();
+                await camera.start();
+                overlay.style.display = 'none';
+            } catch (err) {
+                console.error(err);
+                debugLogEl.innerText = "Error: " + err.message;
+                startBtn.innerText = "Try Again";
+            }
+        });
+
+        function onResults(results) {
+            try {
+                if (canvasElement.width !== results.image.width || canvasElement.height !== results.image.height) {
+                    canvasElement.width = results.image.width;
+                    canvasElement.height = results.image.height;
+                    resize();
+                }
+
+                canvasCtx.save();
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                
+                if (isMirrored) {
+                    canvasCtx.translate(canvasElement.width, 0);
+                    canvasCtx.scale(-1, 1);
+                }
+                
+                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+                let currentChord = "NONE";
+
+                if (results.multiHandLandmarks && results.multiHandedness) {
+                    for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                        const landmarks = results.multiHandLandmarks[i];
+                        const rawLabel = results.multiHandedness[i].label;
+                        const handedness = isMirrored ? (rawLabel === "Right" ? "Left" : "Right") : rawLabel;
+
+                        currentChord = instrument.processHand(landmarks, handedness);
+                    }
+                }
+
+                canvasCtx.restore();
+                instrument.drawInstrument(canvasCtx, canvasElement.width, canvasElement.height);
+
+                chordStatusEl.innerText = `CHORD: ${currentChord}`;
+
+                if (window.AppInventor && window.AppInventor.setWebViewString) {
+                    window.AppInventor.setWebViewString(JSON.stringify({
+                        instrument: "guitar", chord: currentChord
+                    }));
+                }
+            } catch (err) {
+                debugLogEl.innerText = "Error: " + err.message;
+                canvasCtx.restore();
+            }
+        }
+
+        const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        function resize() {
+            const aspect = 640 / 480;
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            const winAspect = winW / winH;
+
+            if (winAspect > aspect) {
+                canvasElement.style.height = '100vh';
+                canvasElement.style.width = (100 * aspect) + 'vh';
+            } else {
+                canvasElement.style.width = '100vw';
+                canvasElement.style.height = (100 / aspect) + 'vw';
+            }
+        }
+        window.addEventListener('resize', resize);
+        resize();
+    </script>
+</body>
+</html>

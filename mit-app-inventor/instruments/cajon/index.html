@@ -10,25 +10,26 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 
-    <!-- Shared Core (Mirrors Python plugin/) -->
+    <!-- Shared Core -->
     <script src="../../shared/pose_classifier.js"></script>
     <script src="../../shared/sound_manager.js"></script>
 
-    <!-- Instrument Specific (Mirrors python_logic_instruments/) -->
+    <!-- Instrument Specific -->
     <script src="./cajon.js"></script>
 
     <style>
-        body { margin: 0; padding: 0; background-color: #000; color: #fff; overflow: hidden; font-family: sans-serif; }
-        #container { position: relative; width: 100vw; height: 100vh; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+        body { margin: 0; padding: 0; background-color: #000; color: #fff; overflow: hidden; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; }
+        #container { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        canvas { background-color: #111; max-width: 100%; max-height: 100%; }
         video { display: none; }
         #status { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; z-index: 10; pointer-events: none; }
         .hand-label { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
         .up { color: #00ff00; }
         .down { color: #ff0000; }
         .none { color: #888; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; cursor: pointer; }
-        #start-btn { padding: 15px 40px; font-size: 1.5rem; background: #007bff; color: white; border: none; border-radius: 30px; cursor: pointer; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
+        #start-btn { padding: 20px 50px; font-size: 1.8rem; background: #007bff; color: white; border: none; border-radius: 40px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0,123,255,0.4); }
+        #start-btn:hover { background: #0056b3; transform: scale(1.05); }
         #controls { position: absolute; bottom: 20px; right: 20px; z-index: 10; }
         .tool-btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid white; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
         #debug-log { font-size: 10px; color: #f00; margin-top: 5px; }
@@ -37,9 +38,9 @@
 <body>
     <div id="overlay">
         <h1>🥁 AirBeat Cajon</h1>
-        <p>Move hand UP then DOWN to play</p>
+        <p style="margin-bottom: 30px; color: #ccc;">Move hand UP then DOWN to play</p>
         <button id="start-btn">TAP TO START</button>
-        <div id="overlay-status" style="margin-top: 20px; color: #aaa;"></div>
+        <div id="overlay-status" style="margin-top: 20px; color: #888;">Ensure camera access is allowed</div>
     </div>
 
     <div id="container">
@@ -65,7 +66,6 @@
         const overlay = document.getElementById('overlay');
         const startBtn = document.getElementById('start-btn');
 
-        // Initialize Core Modules
         const soundManager = new SoundManager();
         const classifier = new PoseClassifier();
         const instrument = new CajonInstrument(soundManager, classifier);
@@ -73,7 +73,6 @@
         let isMirrored = true;
         function toggleMirror() { isMirrored = !isMirrored; }
 
-        // Move camera definition here, but DON'T start yet
         const camera = new Camera(videoElement, {
             onFrame: async () => { await hands.send({image: videoElement}); },
             width: 640,
@@ -82,19 +81,25 @@
 
         startBtn.addEventListener('click', async () => {
             try {
-                startBtn.innerText = "Starting...";
+                startBtn.innerText = "Initializing...";
                 await instrument.setup();
                 await camera.start();
                 overlay.style.display = 'none';
             } catch (err) {
                 console.error(err);
-                debugLogEl.innerText = "Camera Start Error: " + err.message;
-                startBtn.innerText = "Error - check log";
+                debugLogEl.innerText = "Error: " + err.message;
+                startBtn.innerText = "Try Again";
             }
         });
 
         function onResults(results) {
             try {
+                if (canvasElement.width !== results.image.width || canvasElement.height !== results.image.height) {
+                    canvasElement.width = results.image.width;
+                    canvasElement.height = results.image.height;
+                    resize();
+                }
+
                 canvasCtx.save();
                 canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 
@@ -105,9 +110,6 @@
                 
                 canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-                // Let the instrument draw its UI (e.g. center line)
-                instrument.drawInstrument(canvasCtx, canvasElement.width, canvasElement.height);
-
                 let leftStatus = "NONE";
                 let rightStatus = "NONE";
 
@@ -115,35 +117,24 @@
                     for (let i = 0; i < results.multiHandLandmarks.length; i++) {
                         const landmarks = results.multiHandLandmarks[i];
                         const rawLabel = results.multiHandedness[i].label;
-                        
-                        // Fix mirroring for L/R labels
                         const handedness = isMirrored ? (rawLabel === "Right" ? "Left" : "Right") : rawLabel;
 
-                        // Delegate logic to instrument
                         const status = instrument.processHand(landmarks, handedness);
                         
                         if (handedness === "Right") rightStatus = status;
                         else leftStatus = status;
-
-                        // Common Drawing
-                        if (window.drawConnectors && window.HAND_CONNECTIONS) {
-                            window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
-                        }
-                        if (window.drawLandmarks) {
-                            window.drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 2});
-                        }
                     }
                 }
 
+                // Restore context BEFORE drawing instrument UI
                 canvasCtx.restore();
+                instrument.drawInstrument(canvasCtx, canvasElement.width, canvasElement.height);
 
-                // Update UI
                 leftStatusEl.innerText = `L: ${leftStatus}`;
                 leftStatusEl.className = `hand-label ${leftStatus.toLowerCase()}`;
                 rightStatusEl.innerText = `R: ${rightStatus}`;
                 rightStatusEl.className = `hand-label ${rightStatus.toLowerCase()}`;
 
-                // Bridge to App Inventor
                 if (window.AppInventor && window.AppInventor.setWebViewString) {
                     window.AppInventor.setWebViewString(JSON.stringify({
                         instrument: "cajon", left: leftStatus, right: rightStatus
@@ -151,44 +142,53 @@
                 }
             } catch (err) {
                 debugLogEl.innerText = "Error: " + err.message;
-                console.error(err);
                 canvasCtx.restore();
             }
         }
 
-        // MediaPipe Setup
         const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
         hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         hands.onResults(onResults);
 
-        function resize() { canvasElement.width = window.innerWidth; canvasElement.height = window.innerHeight; }
+        function resize() {
+            const aspect = 640 / 480;
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            const winAspect = winW / winH;
+
+            if (winAspect > aspect) {
+                canvasElement.style.height = '100vh';
+                canvasElement.style.width = (100 * aspect) + 'vh';
+            } else {
+                canvasElement.style.width = '100vw';
+                canvasElement.style.height = (100 / aspect) + 'vw';
+            }
+        }
         window.addEventListener('resize', resize);
         resize();
 
         // ─── Dragging Logic ───────────────────────────────────────────────
         function handlePointerDown(e) {
-            const y = (e.touches ? e.touches[0].clientY : e.clientY) / window.innerHeight;
-            // If clicking near the line (within 5% range)
+            const rect = canvasElement.getBoundingClientRect();
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const y = (clientY - rect.top) / rect.height;
             if (Math.abs(y - instrument.ySeparate) < 0.05) {
                 instrument.isDragging = true;
             }
         }
-
         function handlePointerMove(e) {
             if (instrument.isDragging) {
-                const y = (e.touches ? e.touches[0].clientY : e.clientY) / window.innerHeight;
+                const rect = canvasElement.getBoundingClientRect();
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const y = (clientY - rect.top) / rect.height;
                 instrument.setYSeparate(y);
             }
         }
-
-        function handlePointerUp() {
-            instrument.isDragging = false;
-        }
+        function handlePointerUp() { instrument.isDragging = false; }
 
         canvasElement.addEventListener('mousedown', handlePointerDown);
         window.addEventListener('mousemove', handlePointerMove);
         window.addEventListener('mouseup', handlePointerUp);
-
         canvasElement.addEventListener('touchstart', handlePointerDown);
         window.addEventListener('touchmove', handlePointerMove, { passive: false });
         window.addEventListener('touchend', handlePointerUp);

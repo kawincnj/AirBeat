@@ -40,7 +40,7 @@ class GuitarInstrument {
     
     for (const name of chordNames) {
       try {
-        const response = await fetch(`../../../templates/guitar chords/${name}.json`);
+        const response = await fetch(`chords/${name}.json`);
         if (!response.ok) continue;
         const data = await response.json();
         const items = Array.isArray(data) ? data : [data];

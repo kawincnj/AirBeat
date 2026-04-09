@@ -6,14 +6,17 @@ class GuitarInstrument {
   constructor(soundManager) {
     this.soundManager = soundManager;
     // Normalized coordinates (0.0 to 1.0)
-    this.neckBox = { x: 0.05, y: 0.4, w: 0.35, h: 0.4 }; 
-    this.strumLineY = 0.65; 
+    this.neckBox = { x: 0.05, y: 0.4, w: 0.35, h: 0.4 };
+    this.strumLineY = 0.65;
     this.wasAbove = true;
-    
+
     this.templates = [];
     this.currentChord = "Unknown";
     this.isMirrored = true;
-    
+
+    // Stabilizer: 5-frame majority vote (mirrors Python deque(maxlen=5))
+    this.stabilizer = [];
+
     // Smooth visualization
     this.targetFX = -1;
     this.targetFY = -1;
@@ -75,12 +78,11 @@ class GuitarInstrument {
   }
 
   processLeftHand(landmarks) {
-    // 1. Find lead finger (highest tip) - usually the one indicating fret/string
-    const fingerTipIndices = [8, 12, 16, 20];
-    let leadLm = landmarks[8];
-    let leadIdx = 8;
-    
-    for (const idx of fingerTipIndices) {
+    // 1. Find lead landmark (highest on screen) among ALL finger landmarks 5-20
+    //    Mirrors Python: min([(left.landmark[i], i) for i in range(5, 21)], key=lambda x: x[0].y)
+    let leadLm = landmarks[5];
+    let leadIdx = 5;
+    for (let idx = 6; idx <= 20; idx++) {
       if (landmarks[idx].y < leadLm.y) {
         leadLm = landmarks[idx];
         leadIdx = idx;
@@ -119,11 +121,20 @@ class GuitarInstrument {
         }
       }
 
-      // 0.90 threshold for web version (might need slight adjustment vs Python)
-      this.currentChord = bestSim > 0.90 ? bestName : `Unknown (${bestSim.toFixed(2)})`;
+      // Debug: expose best similarity so you can tune the threshold
+      this.lastDebug = `best=${bestName} sim=${bestSim.toFixed(3)} fret=${fret} str=${string} anchor=${leadIdx}`;
+
+      // Stabilizer: push result into 5-frame window, pick majority (mirrors Python deque+Counter)
+      const label = bestSim > 0.92 ? bestName : "Unknown";
+      this.stabilizer.push(label);
+      if (this.stabilizer.length > 5) this.stabilizer.shift();
+      const freq = {};
+      for (const v of this.stabilizer) freq[v] = (freq[v] || 0) + 1;
+      this.currentChord = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
     } else {
       this.currentChord = "Align to Neck";
       this.targetFX = -1;
+      this.stabilizer = []; // reset when hand leaves fretboard
     }
   }
 
@@ -142,39 +153,44 @@ class GuitarInstrument {
     this.wasAbove = isAbove;
   }
 
-  // Optimized vectorizer for guitar (Mirrors Python process_landmarks)
+  // Mirrors Python's StaticPoseTemplate.process_landmarks exactly.
   getGuitarVector(landmarks) {
-    // 3D landmarks
-    const pts = landmarks.map(lm => [lm.x, lm.y, lm.z]);
-    
-    // 3D Distance for palm width (Match Python: linalg.norm(all_pts[5] - all_pts[17]))
+    // Python runs cv2.flip(frame, 1) BEFORE MediaPipe, so its x coords are mirrored:
+    //   x_python = 1 - x_camera
+    // We must apply the same flip so JS vectors match the recorded templates.
+    const pts = landmarks.map(lm => [
+      this.isMirrored ? (1.0 - lm.x) : lm.x,
+      lm.y,
+      lm.z
+    ]);
+
+    // Palm width: 3D distance between landmarks 5 and 17 (Python: linalg.norm(all_pts[5] - all_pts[17]))
     const palmWidth = Math.sqrt(
-      Math.pow(pts[5][0] - pts[17][0], 2) + 
+      Math.pow(pts[5][0] - pts[17][0], 2) +
       Math.pow(pts[5][1] - pts[17][1], 2) +
       Math.pow(pts[5][2] - pts[17][2], 2)
     ) || 1.0;
 
-    // Use landmarks 5 to 20 (fingers)
-    const indices = Array.from({length: 16}, (_, i) => i + 5);
-    const refPt = pts[5]; // Index finger base
-    
-    let vector = new Float32Array(48); // 16 pts * 3 coords
+    // Landmarks 5-20 (16 points), relative to landmark 5 (Python: range(5,21))
+    const refPt = pts[5];
+    const vector = new Float32Array(48);
     let vecIdx = 0;
-    
-    for (const i of indices) {
+
+    for (let i = 5; i <= 20; i++) {
       const p = pts[i];
-      // Weights: Python code weights indices 5:8 (index finger) higher
-      // Note: indices 5,6,7,8 are index finger in MP
-      let weight = (i >= 10 && i <= 12) ? 2.5 : 1.0; // Matching your Python snippet weighting
-      
-      vector[vecIdx++] = ((p[0] - refPt[0]) / palmWidth) * weight;
-      vector[vecIdx++] = ((p[1] - refPt[1]) / palmWidth) * weight;
-      vector[vecIdx++] = ((p[2] - refPt[2]) / palmWidth) * weight;
+      // Python: weights[5:8] = 2.5 → positions 5,6,7 in filtered array = landmarks 10,11,12
+      const w = (i >= 10 && i <= 12) ? 2.5 : 1.0;
+      vector[vecIdx++] = ((p[0] - refPt[0]) / palmWidth) * w;
+      vector[vecIdx++] = ((p[1] - refPt[1]) / palmWidth) * w;
+      vector[vecIdx++] = ((p[2] - refPt[2]) / palmWidth) * w;
     }
 
-    // Normalize final vector
-    const norm = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
-    return norm > 0 ? vector.map(v => v / norm) : vector;
+    // L2 normalize (Python: final_vec / np.linalg.norm(final_vec))
+    let norm = 0;
+    for (let i = 0; i < vector.length; i++) norm += vector[i] * vector[i];
+    norm = Math.sqrt(norm);
+    if (norm > 0) for (let i = 0; i < vector.length; i++) vector[i] /= norm;
+    return vector;
   }
 
   cosineSimilarity(v1, v2) {

@@ -145,15 +145,10 @@
                         const rawLabel = results.multiHandedness[i].label;
                         const handedness = isMirrored ? (rawLabel === "Right" ? "Left" : "Right") : rawLabel;
 
-                        const mappedLandmarks = rawLandmarks.map(p => {
-                            return {
-                                x: (p.x * drawW + xOffset) / cW,
-                                y: (p.y * drawH + yOffset) / cH,
-                                z: p.z
-                            };
-                        });
-
-                        currentChord = instrument.processHand(mappedLandmarks, handedness);
+                        // Use raw MediaPipe normalized landmarks (0-1) for gesture computation.
+                        // Templates were recorded in Python with raw coords — remapping to canvas
+                        // coordinates breaks cosine similarity scores.
+                        currentChord = instrument.processHand(rawLandmarks, handedness);
                     }
                 }
 
@@ -161,6 +156,7 @@
                 instrument.drawInstrument(canvasCtx, cW, cH);
 
                 chordStatusEl.innerText = `CHORD: ${currentChord}`;
+                if (instrument.lastDebug) debugLogEl.innerText = instrument.lastDebug;
 
                 if (window.AppInventor && window.AppInventor.setWebViewString) {
                     window.AppInventor.setWebViewString(JSON.stringify({

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import styles from "./home.module.css";
+import NavigateBar from "../components/navigate_bar";
 import profile from "../assets/profile.jpg";
 import music_search from "../assets/music_search.png";
 import guitar from "../assets/guitar.png";
@@ -63,6 +64,7 @@ function HomePage() {
             </button>
         </div>
 
+        <NavigateBar />
     </div>
   );
 }

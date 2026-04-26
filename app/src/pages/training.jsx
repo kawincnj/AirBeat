@@ -5,8 +5,17 @@ import NavigateBar from "../components/navigate_bar";
 function TrainingPage() {
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>ควยสั้น</h1>
+
+      <div className={styles.headerContainer}>
+        <h1 className={styles.cas}>CHOOSE A SONG</h1>
+        <div className={styles.comsoon}>COMING SOON!</div>
+      </div>
+
+      <div className={styles.songContainer}>
+        <div className={styles.songItem}></div>
+        <div className={styles.songItem}></div>
+        <div className={styles.songItem}></div>
+        <div className={styles.songItem}></div>
       </div>
 
       <NavigateBar />

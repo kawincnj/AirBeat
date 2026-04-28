@@ -6,7 +6,6 @@ function BandPage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>ควยหมา</h1>
       </div>
 
       <NavigateBar />

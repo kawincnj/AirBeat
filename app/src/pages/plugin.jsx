@@ -6,7 +6,6 @@ function PluginPage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>ควยยาว</h1>
       </div>
 
       <NavigateBar />
